@@ -7,7 +7,6 @@ import numpy as np
 st.set_page_config(page_title="Monthly Sales Dashboard", layout="wide", page_icon="📊")
 
 # --- THEME MANAGEMENT ---
-# We place this at the top of the sidebar so it loads first
 st.sidebar.header("Appearance")
 dark_mode = st.sidebar.toggle("🌙 Dark Mode", value=True)
 
@@ -17,71 +16,33 @@ def apply_theme_style(is_dark):
         # DARK THEME CSS
         st.markdown("""
             <style>
-                /* Force entire app background to dark */
-                .stApp {
-                    background-color: #0E1117;
-                    color: #FAFAFA;
-                }
-                /* Force Sidebar background to dark gray */
-                [data-testid="stSidebar"] {
-                    background-color: #262730;
-                    border-right: 1px solid #414141;
-                }
-                /* Adjust headings to white/light gray */
-                h1, h2, h3, h4, h5, h6 {
-                    color: #FAFAFA !important;
-                }
-                /* Metric containers styling */
-                [data-testid="stMetricValue"] {
-                    color: #FAFAFA !important;
-                }
-                [data-testid="stMetricLabel"] {
-                    color: #A3A8B8 !important;
-                }
-                /* Make dataframe borders blend in */
-                .stDataFrame {
-                    border: 1px solid #414141;
-                }
+                .stApp { background-color: #0E1117; color: #FAFAFA; }
+                [data-testid="stSidebar"] { background-color: #262730; border-right: 1px solid #414141; }
+                h1, h2, h3, h4, h5, h6, [data-testid="stMetricValue"] { color: #FAFAFA !important; }
+                [data-testid="stMetricLabel"] { color: #A3A8B8 !important; }
+                .stDataFrame { border: 1px solid #414141; }
             </style>
         """, unsafe_allow_html=True)
         return "plotly_dark"
-        
     else:
-        # LIGHT THEME CSS (Your original code)
+        # LIGHT THEME CSS
         st.markdown("""
             <style>
-                /* Force entire app background to white */
-                .stApp {
-                    background-color: #FFFFFF;
-                    color: #333333;
-                }
-                /* Force Sidebar background to white (with a thin border) */
-                [data-testid="stSidebar"] {
-                    background-color: #FFFFFF;
-                    border-right: 1px solid #E0E0E0;
-                }
-                /* Adjust headings to a dark slate color */
-                h1, h2, h3, h4, h5, h6 {
-                    color: #2C3E50 !important;
-                }
-                /* Metric containers styling */
-                [data-testid="stMetricValue"] {
-                    color: #2C3E50 !important;
-                }
-                /* Make dataframe headers contrast better */
-                .stDataFrame {
-                    border: 1px solid #E0E0E0;
-                }
+                .stApp { background-color: #FFFFFF; color: #333333; }
+                [data-testid="stSidebar"] { background-color: #FFFFFF; border-right: 1px solid #E0E0E0; }
+                h1, h2, h3, h4, h5, h6, [data-testid="stMetricValue"] { color: #2C3E50 !important; }
+                .stDataFrame { border: 1px solid #E0E0E0; }
             </style>
         """, unsafe_allow_html=True)
         return "plotly_white"
 
-# Apply the styles and get the correct plotly template string
 current_theme_template = apply_theme_style(dark_mode)
 
 # --- Chart Color Theme ---
-# We use a color sequence that looks decent on both, but you can change this if needed
-COLOR_SEQUENCE = ["#008080", "#20B2AA", "#40E0D0", "#708090", "#778899", "#B0C4DE"]
+# SETTING THIS TO A SINGLE BLUE COLOR
+# This single color will be used by default for all charts
+COLOR_SEQUENCE = ["#1E88E5"] 
+
 px.defaults.template = current_theme_template
 px.defaults.color_discrete_sequence = COLOR_SEQUENCE
 
@@ -147,15 +108,9 @@ def clean_data(df):
 
 st.title("Monthly Sales Dashboard")
 
-# --- FORMAT REMINDER SECTION (UPDATED) ---
 with st.expander("ℹ️ Check Required CSV Format (Click to View)"):
     st.info("Please ensure your file matches the column arrangement below before uploading.")
-    
-    # -------------------------------------------------------------
-    # REPLACE THE LINE BELOW WITH YOUR IMAGE FILENAME/PATH
-    # st.image("example_format.png", caption="Required Excel/CSV Layout", use_column_width=True)
     st.markdown("**[PLACEHOLDER: Insert your image code here]**") 
-    # -------------------------------------------------------------
 
 uploaded_files = st.file_uploader("Upload Monthly Sales CSV", accept_multiple_files=True, type=['csv'])
 
@@ -218,16 +173,19 @@ if uploaded_files:
         with col_chart1:
             st.subheader("Sales by Month")
             monthly = filtered_df.groupby('Month_Year')['Amount'].sum().reset_index()
-            st.plotly_chart(px.bar(monthly, x='Month_Year', y='Amount', color='Amount'), use_container_width=True)
+            # Removed color='Amount' to keep it single color
+            st.plotly_chart(px.bar(monthly, x='Month_Year', y='Amount'), use_container_width=True)
         
         with col_chart2:
             st.subheader("Weekly Trend")
             weekly = filtered_df.groupby('Week_Start')['Amount'].sum().reset_index()
+            # Line chart automatically picks up the first color in sequence
             st.plotly_chart(px.line(weekly, x='Week_Start', y='Amount', markers=True), use_container_width=True)
 
         st.subheader("Top Products (By Sales)")
         top_prod = filtered_df.groupby('Particular / Desc.')['Amount'].sum().nlargest(10).reset_index()
-        st.plotly_chart(px.bar(top_prod, x='Amount', y='Particular / Desc.', orientation='h', color='Amount'), use_container_width=True)
+        # Removed color='Amount'
+        st.plotly_chart(px.bar(top_prod, x='Amount', y='Particular / Desc.', orientation='h'), use_container_width=True)
 
     # --- TAB 2: INVENTORY HEALTH ---
     with tab2:
@@ -235,7 +193,8 @@ if uploaded_files:
         avg_days = filtered_df['Days_To_Sell'].mean()
         st.metric("Avg. Days on Shelf", f"{avg_days:.1f} Days")
 
-        fig_hist = px.histogram(filtered_df, x='Days_To_Sell', nbins=20, title="Distribution of Days to Sell", color='Category')
+        # Removed color='Category' to make it a single blue distribution
+        fig_hist = px.histogram(filtered_df, x='Days_To_Sell', nbins=20, title="Distribution of Days to Sell")
         st.plotly_chart(fig_hist, use_container_width=True)
         
         st.markdown("#### 🐢 Slowest Moving Items")
@@ -253,7 +212,8 @@ if uploaded_files:
         prod_perf['Margin_Percent'] = (prod_perf['Total_Profit'] / prod_perf['Total_Sales']) * 100
         prod_perf = prod_perf[prod_perf['Total_Sales'] > 0]
 
-        fig_matrix = px.scatter(prod_perf, x='Total_Sales', y='Margin_Percent', size='Count', hover_name='Particular / Desc.', title="Product Profit Matrix", color='Margin_Percent', color_continuous_scale="Teal")
+        # Removed color='Margin_Percent' to make dots single blue
+        fig_matrix = px.scatter(prod_perf, x='Total_Sales', y='Margin_Percent', size='Count', hover_name='Particular / Desc.', title="Product Profit Matrix")
         fig_matrix.add_hline(y=prod_perf['Margin_Percent'].mean(), line_dash="dash", annotation_text="Avg Margin")
         fig_matrix.add_vline(x=prod_perf['Total_Sales'].mean(), line_dash="dash", annotation_text="Avg Sales")
         st.plotly_chart(fig_matrix, use_container_width=True)
@@ -288,5 +248,6 @@ if uploaded_files:
             st.metric("Cash Sales", f"₱{total_cash:,.2f}")
             st.metric("Card Sales", f"₱{total_card:,.2f}")
         with c_pay2:
-            fig_pie = px.pie(pay_df, names='Method', values='Amount', title="Revenue Share", hole=0.5, color_discrete_sequence=["#008080", "#778899"])
+            # Pie charts need at least 2 colors, so I used two shades of blue here
+            fig_pie = px.pie(pay_df, names='Method', values='Amount', title="Revenue Share", hole=0.5, color_discrete_sequence=["#1E88E5", "#90CAF9"])
             st.plotly_chart(fig_pie, use_container_width=True)

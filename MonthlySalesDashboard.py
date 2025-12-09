@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import numpy as np
-import os
+import base64
 
 # --- Configuration ---
 st.set_page_config(page_title="Monthly Sales Dashboard", layout="wide", page_icon="📊")
@@ -117,64 +117,57 @@ st.title("Monthly Sales Dashboard")
 with st.expander("ℹ️ Check Required CSV Format"):
     st.write("Click the link below to view the required column arrangement in a new tab.")
 
-    # 1. Define path logic
-    static_folder = "static"
-    file_name = "sample_layout.html"
-    file_path = os.path.join(static_folder, file_name)
+    # 1. Create the Dummy Data
+    sample_data = pd.DataFrame({
+        'DATE - OUT': ['2025-01-15', '2025-01-16'],
+        'Category': ['Electronics', 'Clothing'],
+        'Particular / Desc.': ['Wireless Mouse', 'Cotton T-Shirt'],
+        'Amount': [500, 250],
+        'Profit': [150, 100],
+        'SALES PERSON': ['Juan', 'Maria'],
+        'DATE - IN': ['2025-01-01', '2025-01-10'],
+        'Cash': [500, 0],
+        'Card': [0, 250]
+    })
+    
+    # 2. Convert to HTML with Styling
+    html_table = sample_data.to_html(index=False, border=0, justify="left", classes="styled-table")
+    
+    # 3. Create the Full HTML Page String
+    full_html = f"""
+    <html>
+    <head>
+        <title>Sample CSV Layout</title>
+        <style>
+            body {{ font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 40px; background-color: #f9f9f9; }}
+            h2 {{ color: #333; }}
+            .styled-table {{ border-collapse: collapse; margin: 25px 0; font-size: 0.9em; min-width: 400px; box-shadow: 0 0 20px rgba(0, 0, 0, 0.15); background-color: #ffffff; }}
+            .styled-table thead tr {{ background-color: #1E88E5; color: #ffffff; text-align: left; }}
+            .styled-table th, .styled-table td {{ padding: 12px 15px; border-bottom: 1px solid #dddddd; color: #333; }}
+            .styled-table tbody tr:nth-of-type(even) {{ background-color: #f3f3f3; }}
+            .styled-table tbody tr:last-of-type {{ border-bottom: 2px solid #1E88E5; }}
+        </style>
+    </head>
+    <body>
+        <h2>Required Excel/CSV Layout</h2>
+        <p style="color:#555;">Your file must contain these exact headers:</p>
+        {html_table}
+    </body>
+    </html>
+    """
 
-    # 2. Ensure static folder exists
-    if not os.path.exists(static_folder):
-        os.makedirs(static_folder)
+    # 4. Encode the HTML string to Base64
+    b64 = base64.b64encode(full_html.encode()).decode()
+    href = f'<a href="data:text/html;base64,{b64}" target="_blank" class="custom-link">🔗 Open Sample File (New Tab)</a>'
 
-    # 3. Auto-generate the HTML file if missing
-    if not os.path.exists(file_path):
-        sample_data = pd.DataFrame({
-            'DATE - OUT': ['2025-01-15', '2025-01-16'],
-            'Category': ['Electronics', 'Clothing'],
-            'Particular / Desc.': ['Wireless Mouse', 'Cotton T-Shirt'],
-            'Amount': [500, 250],
-            'Profit': [150, 100],
-            'SALES PERSON': ['Juan', 'Maria'],
-            'DATE - IN': ['2025-01-01', '2025-01-10'],
-            'Cash': [500, 0],
-            'Card': [0, 250]
-        })
-        
-        # Create HTML content with basic styling
-        html_table = sample_data.to_html(index=False, border=0, justify="left", classes="styled-table")
-        full_html = f"""
-        <html>
-        <head>
-            <title>Sample CSV Layout</title>
-            <style>
-                body {{ font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 40px; background-color: #f9f9f9; }}
-                h2 {{ color: #333; }}
-                .styled-table {{ border-collapse: collapse; margin: 25px 0; font-size: 0.9em; min-width: 400px; box-shadow: 0 0 20px rgba(0, 0, 0, 0.15); background-color: #ffffff; }}
-                .styled-table thead tr {{ background-color: #1E88E5; color: #ffffff; text-align: left; }}
-                .styled-table th, .styled-table td {{ padding: 12px 15px; border-bottom: 1px solid #dddddd; }}
-                .styled-table tbody tr:nth-of-type(even) {{ background-color: #f3f3f3; }}
-                .styled-table tbody tr:last-of-type {{ border-bottom: 2px solid #1E88E5; }}
-            </style>
-        </head>
-        <body>
-            <h2>Required Excel/CSV Layout</h2>
-            <p>Your file must contain these exact headers:</p>
-            {html_table}
-        </body>
-        </html>
-        """
-        with open(file_path, "w", encoding="utf-8") as f:
-            f.write(full_html)
-
-    # 4. Display the link in a container
+    # 5. Display the Link
     with st.container(border=True):
         c1, c2 = st.columns([0.05, 0.95])
         with c1:
             st.markdown("📄")
         with c2:
             st.markdown("**View Sample Layout**")
-            # Note: Streamlit maps the 'static' folder to 'app/static/' in the browser
-            st.markdown(f'<a href="app/static/{file_name}" target="_blank" class="custom-link">🔗 Open Sample File (New Tab)</a>', unsafe_allow_html=True)
+            st.markdown(href, unsafe_allow_html=True)
 
 # --- UPLOAD SECTION ---
 uploaded_files = st.file_uploader("Upload Monthly Sales CSV", accept_multiple_files=True, type=['csv'])
@@ -238,7 +231,7 @@ if uploaded_files:
         with col_chart1:
             st.subheader("Sales by Month")
             monthly = filtered_df.groupby('Month_Year')['Amount'].sum().reset_index()
-            # Removed color argument to keep single blue color
+            # Single blue color
             st.plotly_chart(px.bar(monthly, x='Month_Year', y='Amount'), use_container_width=True)
         
         with col_chart2:
@@ -256,6 +249,7 @@ if uploaded_files:
         avg_days = filtered_df['Days_To_Sell'].mean()
         st.metric("Avg. Days on Shelf", f"{avg_days:.1f} Days")
 
+        # Single blue color
         fig_hist = px.histogram(filtered_df, x='Days_To_Sell', nbins=20, title="Distribution of Days to Sell")
         st.plotly_chart(fig_hist, use_container_width=True)
         
@@ -274,6 +268,7 @@ if uploaded_files:
         prod_perf['Margin_Percent'] = (prod_perf['Total_Profit'] / prod_perf['Total_Sales']) * 100
         prod_perf = prod_perf[prod_perf['Total_Sales'] > 0]
 
+        # Single blue dots
         fig_matrix = px.scatter(prod_perf, x='Total_Sales', y='Margin_Percent', size='Count', hover_name='Particular / Desc.', title="Product Profit Matrix")
         fig_matrix.add_hline(y=prod_perf['Margin_Percent'].mean(), line_dash="dash", annotation_text="Avg Margin")
         fig_matrix.add_vline(x=prod_perf['Total_Sales'].mean(), line_dash="dash", annotation_text="Avg Sales")
@@ -309,6 +304,6 @@ if uploaded_files:
             st.metric("Cash Sales", f"₱{total_cash:,.2f}")
             st.metric("Card Sales", f"₱{total_card:,.2f}")
         with c_pay2:
-            # Pie charts require distinct colors
+            # Pie charts need distinct colors
             fig_pie = px.pie(pay_df, names='Method', values='Amount', title="Revenue Share", hole=0.5, color_discrete_sequence=["#1E88E5", "#90CAF9"])
             st.plotly_chart(fig_pie, use_container_width=True)

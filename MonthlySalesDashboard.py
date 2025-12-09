@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import numpy as np
+import os
 
 # --- Configuration ---
 st.set_page_config(page_title="Monthly Sales Dashboard", layout="wide", page_icon="📊")
@@ -21,6 +22,9 @@ def apply_theme_style(is_dark):
                 h1, h2, h3, h4, h5, h6, [data-testid="stMetricValue"] { color: #FAFAFA !important; }
                 [data-testid="stMetricLabel"] { color: #A3A8B8 !important; }
                 .stDataFrame { border: 1px solid #414141; }
+                /* Custom link style */
+                a.custom-link { color: #40E0D0 !important; text-decoration: none; font-weight: bold; }
+                a.custom-link:hover { text-decoration: underline; }
             </style>
         """, unsafe_allow_html=True)
         return "plotly_dark"
@@ -32,6 +36,9 @@ def apply_theme_style(is_dark):
                 [data-testid="stSidebar"] { background-color: #FFFFFF; border-right: 1px solid #E0E0E0; }
                 h1, h2, h3, h4, h5, h6, [data-testid="stMetricValue"] { color: #2C3E50 !important; }
                 .stDataFrame { border: 1px solid #E0E0E0; }
+                /* Custom link style */
+                a.custom-link { color: #1E88E5 !important; text-decoration: none; font-weight: bold; }
+                a.custom-link:hover { text-decoration: underline; }
             </style>
         """, unsafe_allow_html=True)
         return "plotly_white"
@@ -39,10 +46,8 @@ def apply_theme_style(is_dark):
 current_theme_template = apply_theme_style(dark_mode)
 
 # --- Chart Color Theme ---
-# SETTING THIS TO A SINGLE BLUE COLOR
-# This single color will be used by default for all charts
+# Single Blue Color for all charts
 COLOR_SEQUENCE = ["#1E88E5"] 
-
 px.defaults.template = current_theme_template
 px.defaults.color_discrete_sequence = COLOR_SEQUENCE
 
@@ -108,146 +113,18 @@ def clean_data(df):
 
 st.title("Monthly Sales Dashboard")
 
-with st.expander("ℹ️ Check Required CSV Format (Click to View)"):
-    st.info("Please ensure your file matches the column arrangement below before uploading.")
-    st.markdown("**[PLACEHOLDER: Insert your image code here]**") 
+# --- FORMAT REMINDER SECTION (View-Only Link) ---
+with st.expander("ℹ️ Check Required CSV Format"):
+    st.write("Click the link below to view the required column arrangement in a new tab.")
 
-uploaded_files = st.file_uploader("Upload Monthly Sales CSV", accept_multiple_files=True, type=['csv'])
+    # 1. Define path logic
+    static_folder = "static"
+    file_name = "sample_layout.html"
+    file_path = os.path.join(static_folder, file_name)
 
-if uploaded_files:
-    all_data = []
-    errors = []
+    # 2. Ensure static folder exists
+    if not os.path.exists(static_folder):
+        os.makedirs(static_folder)
 
-    with st.status("Processing Files..."):
-        for file in uploaded_files:
-            raw_df, error = robust_read_csv(file)
-            if error:
-                errors.append(f"File {file.name}: {error}")
-                continue
-            
-            clean_df, clean_error = clean_data(raw_df)
-            if clean_error:
-                errors.append(f"File {file.name}: {clean_error}")
-                continue
-                
-            all_data.append(clean_df)
-
-    if errors:
-        for err in errors:
-            st.warning(err)
-        if not all_data:
-            st.stop()
-
-    main_df = pd.concat(all_data, ignore_index=True)
-    st.success(f"Analyzed {len(main_df)} transactions.")
-
-    # --- Filters ---
-    st.sidebar.header("Filters")
-    selected_months = st.sidebar.multiselect("Select Month", main_df['Month_Year'].unique(), default=main_df['Month_Year'].unique())
-    
-    cats = [c for c in main_df['Category'].unique() if isinstance(c, str)]
-    selected_cats = st.sidebar.multiselect("Select Category", cats, default=cats)
-
-    if not selected_cats:
-        st.warning("Please select at least one Category.")
-        st.stop()
-
-    filtered_df = main_df[
-        (main_df['Month_Year'].isin(selected_months)) & 
-        (main_df['Category'].isin(selected_cats))
-    ]
-
-    # --- MAIN TABS ---
-    tab1, tab2, tab3, tab4, tab5 = st.tabs([
-        "Overview", "Inventory", "Profit Matrix", "Team", "Payments"
-    ])
-
-    # --- TAB 1: SALES OVERVIEW ---
-    with tab1:
-        c1, c2, c3 = st.columns(3)
-        c1.metric("Total Revenue", f"₱{filtered_df['Amount'].sum():,.2f}")
-        c2.metric("Total Profit", f"₱{filtered_df['Profit'].sum():,.2f}")
-        c3.metric("Avg Sale Value", f"₱{filtered_df['Amount'].mean():,.2f}")
-
-        col_chart1, col_chart2 = st.columns(2)
-        with col_chart1:
-            st.subheader("Sales by Month")
-            monthly = filtered_df.groupby('Month_Year')['Amount'].sum().reset_index()
-            # Removed color='Amount' to keep it single color
-            st.plotly_chart(px.bar(monthly, x='Month_Year', y='Amount'), use_container_width=True)
-        
-        with col_chart2:
-            st.subheader("Weekly Trend")
-            weekly = filtered_df.groupby('Week_Start')['Amount'].sum().reset_index()
-            # Line chart automatically picks up the first color in sequence
-            st.plotly_chart(px.line(weekly, x='Week_Start', y='Amount', markers=True), use_container_width=True)
-
-        st.subheader("Top Products (By Sales)")
-        top_prod = filtered_df.groupby('Particular / Desc.')['Amount'].sum().nlargest(10).reset_index()
-        # Removed color='Amount'
-        st.plotly_chart(px.bar(top_prod, x='Amount', y='Particular / Desc.', orientation='h'), use_container_width=True)
-
-    # --- TAB 2: INVENTORY HEALTH ---
-    with tab2:
-        st.markdown("### ⏳ Inventory Shelf Life")
-        avg_days = filtered_df['Days_To_Sell'].mean()
-        st.metric("Avg. Days on Shelf", f"{avg_days:.1f} Days")
-
-        # Removed color='Category' to make it a single blue distribution
-        fig_hist = px.histogram(filtered_df, x='Days_To_Sell', nbins=20, title="Distribution of Days to Sell")
-        st.plotly_chart(fig_hist, use_container_width=True)
-        
-        st.markdown("#### 🐢 Slowest Moving Items")
-        slow_movers = filtered_df.sort_values('Days_To_Sell', ascending=False).head(10)
-        st.dataframe(slow_movers[['Particular / Desc.', 'Category', 'Date_In', 'Date_Sold', 'Days_To_Sell']], use_container_width=True)
-
-    # --- TAB 3: PROFIT MATRIX ---
-    with tab3:
-        st.markdown("### 💎 Profitability vs. Volume")
-        prod_perf = filtered_df.groupby('Particular / Desc.').agg(
-            Total_Sales=('Amount', 'sum'),
-            Total_Profit=('Profit', 'sum'),
-            Count=('Amount', 'count')
-        ).reset_index()
-        prod_perf['Margin_Percent'] = (prod_perf['Total_Profit'] / prod_perf['Total_Sales']) * 100
-        prod_perf = prod_perf[prod_perf['Total_Sales'] > 0]
-
-        # Removed color='Margin_Percent' to make dots single blue
-        fig_matrix = px.scatter(prod_perf, x='Total_Sales', y='Margin_Percent', size='Count', hover_name='Particular / Desc.', title="Product Profit Matrix")
-        fig_matrix.add_hline(y=prod_perf['Margin_Percent'].mean(), line_dash="dash", annotation_text="Avg Margin")
-        fig_matrix.add_vline(x=prod_perf['Total_Sales'].mean(), line_dash="dash", annotation_text="Avg Sales")
-        st.plotly_chart(fig_matrix, use_container_width=True)
-
-    # --- TAB 4: TEAM SCORECARD ---
-    with tab4:
-        st.markdown("### 🏆 Salesperson Performance")
-        team_perf = filtered_df.groupby('SALES PERSON').agg(
-            Total_Sales=('Amount', 'sum'),
-            Total_Profit=('Profit', 'sum'),
-            Transactions=('Amount', 'count')
-        ).reset_index()
-        team_perf['Avg_Ticket'] = team_perf['Total_Sales'] / team_perf['Transactions']
-        team_perf['Efficiency'] = (team_perf['Total_Profit'] / team_perf['Total_Sales']) * 100
-        
-        c_team1, c_team2 = st.columns(2)
-        with c_team1:
-            st.plotly_chart(px.bar(team_perf, x='SALES PERSON', y='Total_Sales', title="Revenue by Person"), use_container_width=True)
-        with c_team2:
-            st.plotly_chart(px.bar(team_perf, x='SALES PERSON', y='Efficiency', title="Profit Efficiency (%)"), use_container_width=True)
-        st.dataframe(team_perf.style.format({"Total_Sales": "₱{:,.2f}", "Total_Profit": "₱{:,.2f}", "Avg_Ticket": "₱{:,.2f}", "Efficiency": "{:.1f}%"}), use_container_width=True)
-
-    # --- TAB 5: PAYMENTS ---
-    with tab5:
-        st.markdown("### 💳 Payment Analysis")
-        total_cash = filtered_df['Cash'].sum()
-        total_card = filtered_df['Card'].sum()
-        pay_df = pd.DataFrame({'Method': ['Cash', 'Card'], 'Amount': [total_cash, total_card]})
-        
-        c_pay1, c_pay2 = st.columns([1, 2])
-        with c_pay1:
-            st.metric("Cash Sales", f"₱{total_cash:,.2f}")
-            st.metric("Card Sales", f"₱{total_card:,.2f}")
-        with c_pay2:
-            # Pie charts need at least 2 colors, so I used two shades of blue here
-            fig_pie = px.pie(pay_df, names='Method', values='Amount', title="Revenue Share", hole=0.5, color_discrete_sequence=["#1E88E5", "#90CAF9"])
-            st.plotly_chart(fig_pie, use_container_width=True)
+    # 3. Auto-generate the HTML file if missing
+    if not os.path.exists(file_path):

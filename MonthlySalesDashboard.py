@@ -1,86 +1,89 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-import plotly.graph_objects as go
 import numpy as np
 
 # --- Configuration ---
 st.set_page_config(page_title="Monthly Sales Dashboard", layout="wide", page_icon="📊")
 
-# --- CUSTOM STYLING ---
-def apply_custom_style():
-    st.markdown("""
-        <style>
-            /* Nuclear option - force white everywhere */
-            * {
-                background-color: transparent !important;
-            }
-            
-            .stApp, .main, .block-container, section[data-testid="stSidebar"], 
-            header[data-testid="stHeader"], [data-testid="stVerticalBlock"],
-            [data-testid="stHorizontalBlock"] {
-                background-color: #FFFFFF !important;
-            }
-            
-            /* Sidebar specific */
-            section[data-testid="stSidebar"] > div {
-                background-color: #FFFFFF !important;
-            }
-            
-            section[data-testid="stSidebar"] * {
-                color: #1a1a1a !important;
-            }
-            
-            /* Main content text */
-            .stApp *, .main *, h1, h2, h3, h4, h5, h6, p, span, div, label {
-                color: #1a1a1a !important;
-            }
-            
-            /* Metrics */
-            [data-testid="stMetricValue"], [data-testid="stMetricLabel"] {
-                color: #1a1a1a !important;
-            }
-            
-            /* Tabs */
-            button[data-baseweb="tab"] {
-                background-color: #f5f5f5 !important;
-                color: #1a1a1a !important;
-            }
-            
-            button[data-baseweb="tab"][aria-selected="true"] {
-                background-color: #FFFFFF !important;
-                border-bottom: 3px solid #008080 !important;
-            }
-            
-            /* File uploader */
-            [data-testid="stFileUploader"] {
-                background-color: #f9f9f9 !important;
-                border: 2px dashed #cccccc !important;
-            }
-            
-            /* Success/Info/Warning */
-            .stSuccess, .stInfo, .stWarning {
-                background-color: #e8f5e9 !important;
-                color: #1a1a1a !important;
-            }
-            
-            /* Expander */
-            [data-testid="stExpander"] {
-                background-color: #f5f5f5 !important;
-                border: 1px solid #e0e0e0 !important;
-            }
-            
-            /* Status */
-            [data-testid="stStatusWidget"] {
-                background-color: #FFFFFF !important;
-            }
-        </style>
-    """, unsafe_allow_html=True)
+# --- THEME MANAGEMENT ---
+# We place this at the top of the sidebar so it loads first
+st.sidebar.header("Appearance")
+dark_mode = st.sidebar.toggle("🌙 Dark Mode", value=True)
 
-apply_custom_style()
+# --- CUSTOM STYLING ---
+def apply_theme_style(is_dark):
+    if is_dark:
+        # DARK THEME CSS
+        st.markdown("""
+            <style>
+                /* Force entire app background to dark */
+                .stApp {
+                    background-color: #0E1117;
+                    color: #FAFAFA;
+                }
+                /* Force Sidebar background to dark gray */
+                [data-testid="stSidebar"] {
+                    background-color: #262730;
+                    border-right: 1px solid #414141;
+                }
+                /* Adjust headings to white/light gray */
+                h1, h2, h3, h4, h5, h6 {
+                    color: #FAFAFA !important;
+                }
+                /* Metric containers styling */
+                [data-testid="stMetricValue"] {
+                    color: #FAFAFA !important;
+                }
+                [data-testid="stMetricLabel"] {
+                    color: #A3A8B8 !important;
+                }
+                /* Make dataframe borders blend in */
+                .stDataFrame {
+                    border: 1px solid #414141;
+                }
+            </style>
+        """, unsafe_allow_html=True)
+        return "plotly_dark"
+        
+    else:
+        # LIGHT THEME CSS (Your original code)
+        st.markdown("""
+            <style>
+                /* Force entire app background to white */
+                .stApp {
+                    background-color: #FFFFFF;
+                    color: #333333;
+                }
+                /* Force Sidebar background to white (with a thin border) */
+                [data-testid="stSidebar"] {
+                    background-color: #FFFFFF;
+                    border-right: 1px solid #E0E0E0;
+                }
+                /* Adjust headings to a dark slate color */
+                h1, h2, h3, h4, h5, h6 {
+                    color: #2C3E50 !important;
+                }
+                /* Metric containers styling */
+                [data-testid="stMetricValue"] {
+                    color: #2C3E50 !important;
+                }
+                /* Make dataframe headers contrast better */
+                .stDataFrame {
+                    border: 1px solid #E0E0E0;
+                }
+            </style>
+        """, unsafe_allow_html=True)
+        return "plotly_white"
+
+# Apply the styles and get the correct plotly template string
+current_theme_template = apply_theme_style(dark_mode)
 
 # --- Chart Color Theme ---
-TEAL_COLORS = ["#008080", "#20B2AA", "#40E0D0", "#5F9EA0", "#66CDAA"]
+# We use a color sequence that looks decent on both, but you can change this if needed
+COLOR_SEQUENCE = ["#008080", "#20B2AA", "#40E0D0", "#708090", "#778899", "#B0C4DE"]
+px.defaults.template = current_theme_template
+px.defaults.color_discrete_sequence = COLOR_SEQUENCE
 
 # --- Constants ---
 REQUIRED_COLUMNS = [
@@ -89,46 +92,6 @@ REQUIRED_COLUMNS = [
 ]
 
 # --- Helper Functions ---
-
-def style_chart(fig):
-    """Force white background on all Plotly charts"""
-    fig.update_layout(
-        template="plotly_white",  # Use white template
-        paper_bgcolor="rgba(255,255,255,1)",
-        plot_bgcolor="rgba(255,255,255,1)",
-        font=dict(color="#1a1a1a", size=12, family="Arial"),
-        title_font=dict(color="#1a1a1a", size=16),
-        xaxis=dict(
-            showgrid=True,
-            gridcolor="rgba(230,230,230,0.5)",
-            linecolor="#d0d0d0",
-            tickfont=dict(color="#1a1a1a"),
-            title_font=dict(color="#1a1a1a")
-        ),
-        yaxis=dict(
-            showgrid=True,
-            gridcolor="rgba(230,230,230,0.5)",
-            linecolor="#d0d0d0",
-            tickfont=dict(color="#1a1a1a"),
-            title_font=dict(color="#1a1a1a")
-        ),
-        legend=dict(
-            bgcolor="rgba(255,255,255,0.9)",
-            bordercolor="#d0d0d0",
-            borderwidth=1,
-            font=dict(color="#1a1a1a")
-        ),
-        margin=dict(t=60, l=60, r=40, b=60),
-        coloraxis=dict(
-            colorbar=dict(
-                bgcolor="rgba(255,255,255,0.9)",
-                tickfont=dict(color="#1a1a1a"),
-                tickcolor="#1a1a1a"
-            )
-        )
-    )
-    return fig
-
 def robust_read_csv(file):
     try:
         preview = pd.read_csv(file, header=None, nrows=20)
@@ -140,7 +103,7 @@ def robust_read_csv(file):
                 break
         
         if header_row_idx is None:
-            return None, "Could not find standard headers"
+            return None, "Could not find standard headers (DATE - OUT, Category, etc.)"
         
         file.seek(0)
         df = pd.read_csv(file, header=header_row_idx)
@@ -159,11 +122,12 @@ def clean_data(df):
     df.columns = df.columns.str.strip()
     missing_cols = [col for col in REQUIRED_COLUMNS if col not in df.columns]
     if missing_cols:
-        return None, f"Missing columns: {', '.join(missing_cols)}"
+        return None, f"Missing required columns: {', '.join(missing_cols)}"
     
     df = df.dropna(subset=['DATE - OUT'])
     
-    for col in ['Amount', 'Profit', 'Cash', 'Card']:
+    cols_to_clean = ['Amount', 'Profit', 'Cash', 'Card']
+    for col in cols_to_clean:
         if col in df.columns:
             df[col] = clean_currency(df[col])
 
@@ -173,42 +137,25 @@ def clean_data(df):
 
     df['Month_Year'] = df['Date_Sold'].dt.to_period('M').astype(str)
     df['Week_Start'] = df['Date_Sold'].dt.to_period('W').apply(lambda r: r.start_time)
+    
     df['Days_To_Sell'] = (df['Date_Sold'] - df['Date_In']).dt.days
     df.loc[(df['Days_To_Sell'] < 0) | (df['Days_To_Sell'] > 1000), 'Days_To_Sell'] = np.nan
 
     return df, None
 
-def forecast_sales(df):
-    daily_sales = df.groupby('Date_Sold')['Amount'].sum().reset_index()
-    daily_sales = daily_sales.sort_values('Date_Sold')
-    
-    if len(daily_sales) < 3:
-        return None, "Not enough data"
-
-    daily_sales['Time_Index'] = np.arange(len(daily_sales))
-    x = daily_sales['Time_Index']
-    y = daily_sales['Amount']
-    
-    try:
-        m, c = np.polyfit(x, y, 1)
-        next_idx = x.max() + 1
-        next_sales = m * next_idx + c
-        trend_desc = "Increasing 📈" if m > 0 else "Decreasing 📉"
-        
-        return {
-            'next_val': next_sales,
-            'trend': trend_desc,
-            'data': daily_sales,
-            'reg_line': m * x + c
-        }, None
-    except:
-        return None, "Calculation error"
-
 # --- Main App ---
-st.title("📊 Monthly Sales Dashboard")
 
-with st.expander("ℹ️ Check Required CSV Format"):
-    st.write("**Required Columns:** DATE - OUT, Category, Particular / Desc., Amount, Profit, SALES PERSON, DATE - IN, Cash, Card")
+st.title("Monthly Sales Dashboard")
+
+# --- FORMAT REMINDER SECTION (UPDATED) ---
+with st.expander("ℹ️ Check Required CSV Format (Click to View)"):
+    st.info("Please ensure your file matches the column arrangement below before uploading.")
+    
+    # -------------------------------------------------------------
+    # REPLACE THE LINE BELOW WITH YOUR IMAGE FILENAME/PATH
+    # st.image("example_format.png", caption="Required Excel/CSV Layout", use_column_width=True)
+    st.markdown("**[PLACEHOLDER: Insert your image code here]**") 
+    # -------------------------------------------------------------
 
 uploaded_files = st.file_uploader("Upload Monthly Sales CSV", accept_multiple_files=True, type=['csv'])
 
@@ -220,13 +167,14 @@ if uploaded_files:
         for file in uploaded_files:
             raw_df, error = robust_read_csv(file)
             if error:
-                errors.append(f"{file.name}: {error}")
+                errors.append(f"File {file.name}: {error}")
                 continue
             
             clean_df, clean_error = clean_data(raw_df)
             if clean_error:
-                errors.append(f"{file.name}: {clean_error}")
+                errors.append(f"File {file.name}: {clean_error}")
                 continue
+                
             all_data.append(clean_df)
 
     if errors:
@@ -236,19 +184,17 @@ if uploaded_files:
             st.stop()
 
     main_df = pd.concat(all_data, ignore_index=True)
-    st.success(f"✅ Analyzed {len(main_df)} transactions from {len(uploaded_files)} file(s)")
+    st.success(f"Analyzed {len(main_df)} transactions.")
 
     # --- Filters ---
-    st.sidebar.header("📋 Filters")
-    
-    available_months = sorted(main_df['Month_Year'].unique())
-    selected_months = st.sidebar.multiselect("Select Month", available_months, default=available_months)
+    st.sidebar.header("Filters")
+    selected_months = st.sidebar.multiselect("Select Month", main_df['Month_Year'].unique(), default=main_df['Month_Year'].unique())
     
     cats = [c for c in main_df['Category'].unique() if isinstance(c, str)]
     selected_cats = st.sidebar.multiselect("Select Category", cats, default=cats)
 
     if not selected_cats:
-        st.warning("Select at least one Category")
+        st.warning("Please select at least one Category.")
         st.stop()
 
     filtered_df = main_df[
@@ -256,158 +202,91 @@ if uploaded_files:
         (main_df['Category'].isin(selected_cats))
     ]
 
-    if filtered_df.empty:
-        st.warning("No data matches filters")
-        st.stop()
+    # --- MAIN TABS ---
+    tab1, tab2, tab3, tab4, tab5 = st.tabs([
+        "Overview", "Inventory", "Profit Matrix", "Team", "Payments"
+    ])
 
-    # --- TABS ---
-    tab1, tab2, tab3, tab4, tab5 = st.tabs(["📈 Overview", "📦 Inventory", "💎 Profit Matrix", "👥 Team", "💳 Payments"])
-
-    # --- TAB 1: OVERVIEW ---
+    # --- TAB 1: SALES OVERVIEW ---
     with tab1:
-        col1, col2, col3 = st.columns(3)
-        col1.metric("Total Revenue", f"₱{filtered_df['Amount'].sum():,.2f}")
-        col2.metric("Total Profit", f"₱{filtered_df['Profit'].sum():,.2f}")
-        col3.metric("Avg Sale", f"₱{filtered_df['Amount'].mean():,.2f}")
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Total Revenue", f"₱{filtered_df['Amount'].sum():,.2f}")
+        c2.metric("Total Profit", f"₱{filtered_df['Profit'].sum():,.2f}")
+        c3.metric("Avg Sale Value", f"₱{filtered_df['Amount'].mean():,.2f}")
 
-        st.write("")
-        
-        c1, c2 = st.columns(2)
-        
-        with c1:
+        col_chart1, col_chart2 = st.columns(2)
+        with col_chart1:
             st.subheader("Sales by Month")
             monthly = filtered_df.groupby('Month_Year')['Amount'].sum().reset_index()
-            fig1 = px.bar(monthly, x='Month_Year', y='Amount', 
-                         labels={'Amount': 'Sales (₱)', 'Month_Year': 'Month'})
-            fig1.update_traces(marker_color='#008080')
-            st.plotly_chart(style_chart(fig1), use_container_width=True, theme=None)
+            st.plotly_chart(px.bar(monthly, x='Month_Year', y='Amount', color='Amount'), use_container_width=True)
         
-        with c2:
+        with col_chart2:
             st.subheader("Weekly Trend")
             weekly = filtered_df.groupby('Week_Start')['Amount'].sum().reset_index()
-            fig2 = px.line(weekly, x='Week_Start', y='Amount', markers=True,
-                          labels={'Amount': 'Sales (₱)', 'Week_Start': 'Week'})
-            fig2.update_traces(line_color='#008080', marker=dict(size=8))
-            st.plotly_chart(style_chart(fig2), use_container_width=True, theme=None)
+            st.plotly_chart(px.line(weekly, x='Week_Start', y='Amount', markers=True), use_container_width=True)
 
-        st.write("")
-        st.subheader("Top 10 Products")
+        st.subheader("Top Products (By Sales)")
         top_prod = filtered_df.groupby('Particular / Desc.')['Amount'].sum().nlargest(10).reset_index()
-        top_prod = top_prod.sort_values('Amount', ascending=True)
-        fig3 = px.bar(top_prod, x='Amount', y='Particular / Desc.', orientation='h',
-                     labels={'Amount': 'Sales (₱)', 'Particular / Desc.': 'Product'})
-        fig3.update_traces(marker_color='#008080')
-        st.plotly_chart(style_chart(fig3), use_container_width=True, theme=None)
+        st.plotly_chart(px.bar(top_prod, x='Amount', y='Particular / Desc.', orientation='h', color='Amount'), use_container_width=True)
 
-        st.write("")
-        st.subheader("🔮 Sales Forecast")
-        fc_res, fc_err = forecast_sales(filtered_df)
-        if fc_res:
-            c1, c2 = st.columns([1, 2])
-            with c1:
-                st.metric("Next Day Projection", f"₱{fc_res['next_val']:,.2f}", delta=fc_res['trend'])
-            with c2:
-                fc_data = fc_res['data']
-                fig4 = go.Figure()
-                fig4.add_trace(go.Scatter(x=fc_data['Date_Sold'], y=fc_data['Amount'],
-                    mode='markers', name='Actual', marker=dict(color='#20B2AA', size=8)))
-                fig4.add_trace(go.Scatter(x=fc_data['Date_Sold'], y=fc_res['reg_line'],
-                    mode='lines', name='Trend', line=dict(color='#008080', width=2, dash='dash')))
-                fig4.update_layout(xaxis_title="Date", yaxis_title="Sales (₱)")
-                st.plotly_chart(style_chart(fig4), use_container_width=True, theme=None)
-        else:
-            st.info(fc_err)
-
-    # --- TAB 2: INVENTORY ---
+    # --- TAB 2: INVENTORY HEALTH ---
     with tab2:
-        st.subheader("⏳ Inventory Shelf Life")
-        valid_inv = filtered_df.dropna(subset=['Days_To_Sell'])
-        if not valid_inv.empty:
-            avg_days = valid_inv['Days_To_Sell'].mean()
-            st.metric("Avg Days on Shelf", f"{avg_days:.1f} Days")
-            
-            st.write("")
-            fig5 = px.histogram(valid_inv, x='Days_To_Sell', nbins=25, color='Category',
-                               labels={'Days_To_Sell': 'Days to Sell'},
-                               color_discrete_sequence=TEAL_COLORS)
-            st.plotly_chart(style_chart(fig5), use_container_width=True, theme=None)
-            
-            st.write("")
-            st.write("**Slowest Moving Items**")
-            slow = valid_inv.nlargest(10, 'Days_To_Sell')[['Particular / Desc.', 'Category', 'Days_To_Sell']]
-            st.dataframe(slow, use_container_width=True, hide_index=True)
-        else:
-            st.info("No shelf life data available")
+        st.markdown("### ⏳ Inventory Shelf Life")
+        avg_days = filtered_df['Days_To_Sell'].mean()
+        st.metric("Avg. Days on Shelf", f"{avg_days:.1f} Days")
+
+        fig_hist = px.histogram(filtered_df, x='Days_To_Sell', nbins=20, title="Distribution of Days to Sell", color='Category')
+        st.plotly_chart(fig_hist, use_container_width=True)
+        
+        st.markdown("#### 🐢 Slowest Moving Items")
+        slow_movers = filtered_df.sort_values('Days_To_Sell', ascending=False).head(10)
+        st.dataframe(slow_movers[['Particular / Desc.', 'Category', 'Date_In', 'Date_Sold', 'Days_To_Sell']], use_container_width=True)
 
     # --- TAB 3: PROFIT MATRIX ---
     with tab3:
-        st.subheader("💎 Profitability vs Volume")
+        st.markdown("### 💎 Profitability vs. Volume")
         prod_perf = filtered_df.groupby('Particular / Desc.').agg(
-            Total_Sales=('Amount', 'sum'), 
-            Total_Profit=('Profit', 'sum'), 
+            Total_Sales=('Amount', 'sum'),
+            Total_Profit=('Profit', 'sum'),
             Count=('Amount', 'count')
         ).reset_index()
-        prod_perf['Margin_Pct'] = (prod_perf['Total_Profit'] / prod_perf['Total_Sales']) * 100
+        prod_perf['Margin_Percent'] = (prod_perf['Total_Profit'] / prod_perf['Total_Sales']) * 100
         prod_perf = prod_perf[prod_perf['Total_Sales'] > 0]
-        
-        avg_margin = prod_perf['Margin_Pct'].mean()
-        avg_sales = prod_perf['Total_Sales'].mean()
-        
-        fig6 = px.scatter(prod_perf, x='Total_Sales', y='Margin_Pct', size='Count',
-                         hover_name='Particular / Desc.',
-                         labels={'Total_Sales': 'Sales (₱)', 'Margin_Pct': 'Margin (%)', 'Count': 'Transactions'})
-        fig6.update_traces(marker=dict(color='#008080', line=dict(width=1, color='white')))
-        fig6.add_hline(y=avg_margin, line_dash="dash", line_color="#999",
-                      annotation_text=f"Avg: {avg_margin:.1f}%", annotation_position="right")
-        fig6.add_vline(x=avg_sales, line_dash="dash", line_color="#999",
-                      annotation_text=f"Avg: ₱{avg_sales:,.0f}", annotation_position="top")
-        st.plotly_chart(style_chart(fig6), use_container_width=True, theme=None)
 
-    # --- TAB 4: TEAM ---
+        fig_matrix = px.scatter(prod_perf, x='Total_Sales', y='Margin_Percent', size='Count', hover_name='Particular / Desc.', title="Product Profit Matrix", color='Margin_Percent', color_continuous_scale="Teal")
+        fig_matrix.add_hline(y=prod_perf['Margin_Percent'].mean(), line_dash="dash", annotation_text="Avg Margin")
+        fig_matrix.add_vline(x=prod_perf['Total_Sales'].mean(), line_dash="dash", annotation_text="Avg Sales")
+        st.plotly_chart(fig_matrix, use_container_width=True)
+
+    # --- TAB 4: TEAM SCORECARD ---
     with tab4:
-        st.subheader("🏆 Team Performance")
+        st.markdown("### 🏆 Salesperson Performance")
         team_perf = filtered_df.groupby('SALES PERSON').agg(
-            Total_Sales=('Amount', 'sum'), 
-            Total_Profit=('Profit', 'sum'), 
+            Total_Sales=('Amount', 'sum'),
+            Total_Profit=('Profit', 'sum'),
             Transactions=('Amount', 'count')
         ).reset_index()
+        team_perf['Avg_Ticket'] = team_perf['Total_Sales'] / team_perf['Transactions']
         team_perf['Efficiency'] = (team_perf['Total_Profit'] / team_perf['Total_Sales']) * 100
-        team_perf = team_perf.sort_values('Total_Sales', ascending=False)
         
-        c1, c2 = st.columns(2)
-        with c1:
-            st.write("**Total Sales**")
-            fig7 = px.bar(team_perf, x='SALES PERSON', y='Total_Sales',
-                         labels={'Total_Sales': 'Sales (₱)', 'SALES PERSON': 'Team Member'})
-            fig7.update_traces(marker_color='#008080')
-            st.plotly_chart(style_chart(fig7), use_container_width=True, theme=None)
-            
-        with c2:
-            st.write("**Profit Efficiency (%)**")
-            fig8 = px.bar(team_perf, x='SALES PERSON', y='Efficiency',
-                         labels={'Efficiency': 'Efficiency (%)', 'SALES PERSON': 'Team Member'})
-            fig8.update_traces(marker_color='#20B2AA')
-            st.plotly_chart(style_chart(fig8), use_container_width=True, theme=None)
+        c_team1, c_team2 = st.columns(2)
+        with c_team1:
+            st.plotly_chart(px.bar(team_perf, x='SALES PERSON', y='Total_Sales', title="Revenue by Person"), use_container_width=True)
+        with c_team2:
+            st.plotly_chart(px.bar(team_perf, x='SALES PERSON', y='Efficiency', title="Profit Efficiency (%)"), use_container_width=True)
+        st.dataframe(team_perf.style.format({"Total_Sales": "₱{:,.2f}", "Total_Profit": "₱{:,.2f}", "Avg_Ticket": "₱{:,.2f}", "Efficiency": "{:.1f}%"}), use_container_width=True)
 
     # --- TAB 5: PAYMENTS ---
     with tab5:
-        st.subheader("💳 Payment Methods")
+        st.markdown("### 💳 Payment Analysis")
         total_cash = filtered_df['Cash'].sum()
         total_card = filtered_df['Card'].sum()
+        pay_df = pd.DataFrame({'Method': ['Cash', 'Card'], 'Amount': [total_cash, total_card]})
         
-        c1, c2 = st.columns([1, 2])
-        with c1:
-            st.metric("💵 Cash", f"₱{total_cash:,.2f}")
-            st.metric("💳 Card", f"₱{total_card:,.2f}")
-            pct = (total_cash/(total_cash+total_card))*100 if (total_cash+total_card)>0 else 0
-            st.metric("Cash %", f"{pct:.1f}%")
-            
-        with c2:
-            pay_df = pd.DataFrame({'Method': ['Cash', 'Card'], 'Amount': [total_cash, total_card]})
-            fig9 = px.pie(pay_df, names='Method', values='Amount', hole=0.5)
-            fig9.update_traces(marker=dict(colors=['#008080', '#5F9EA0']),
-                              textfont=dict(color='white', size=14))
-            st.plotly_chart(style_chart(fig9), use_container_width=True, theme=None)
-
-else:
-    st.info("📁 Upload CSV files to begin")
+        c_pay1, c_pay2 = st.columns([1, 2])
+        with c_pay1:
+            st.metric("Cash Sales", f"₱{total_cash:,.2f}")
+            st.metric("Card Sales", f"₱{total_card:,.2f}")
+        with c_pay2:
+            fig_pie = px.pie(pay_df, names='Method', values='Amount', title="Revenue Share", hole=0.5, color_discrete_sequence=["#008080", "#778899"])
+            st.plotly_chart(fig_pie, use_container_width=True)
